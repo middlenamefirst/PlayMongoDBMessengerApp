@@ -5,7 +5,9 @@
 !.gitignore
 
 # Ignore Play! working directory #
+bin
 db
+dist
 eclipse
 lib
 log
@@ -14,6 +16,7 @@ modules
 precompiled
 project/project
 project/target
+RUNNING_PID
 target
 tmp
 test-result
