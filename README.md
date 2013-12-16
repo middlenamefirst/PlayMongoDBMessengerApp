@@ -32,6 +32,80 @@ By default Play will listen on port 9000. Once you see the following (assuming t
 
     (Server started, use Ctrl+D to stop and go back to the console...)
 
+## Using The Server
+
+Interacting with the server is done via HTTP POST requests and the [JSON](http://en.wikipedia.org/wiki/JSON) data format. The following routes and data formats are supported:
+
+* POST    /register
+ * Request: The Content-Type and HTTP Body Data are currently ignored for this request.
+ * Response: Content-Type: application/json; charset=utf-8
+   * Example:
+     ```{
+            "registration_id": "296B345063A70AD82206B96760C41EA4322F12A5F66E911C56641D4CF5BB3A7B" 
+        }```
+
+* POST    /deregister
+ * Request:
+   * Example:
+     ```{
+            "registration_id": "857DE46BBBAA3BA840500986D7EE6DEF891135BC6CF643966BDFF648EC496203"
+        }```
+ * Response: Content-Type: application/json; charset=utf-8
+   * Example:
+     ```{
+            "status": "OK"
+        }```
+
+* POST	  /send
+ * Request:
+   * Example:
+     ```{
+            "registration_id": "C7ED71978BC4467E0F11AFEEC0078D6F6D5686FE9072110DD6DDBC28AB7656BB", 
+            "expiry": 10000000, 
+            "data": {"test": {}}
+        }```
+ * Response: Content-Type: application/json; charset=utf-8
+   * Example:
+     ```{
+            "message_id": "57fce493-21eb-477f-b173-17d56979e265"
+        }```
+
+* POST	  /fetchAll
+ * Request: 
+   * Example:
+     ```{
+            "registration_id": "857DE46BBBAA3BA840500986D7EE6DEF891135BC6CF643966BDFF648EC496203"
+        }```
+ * Response: Content-Type: application/json; charset=utf-8
+   * Example:
+     ```[
+            {
+                "id": "57fce493-21eb-477f-b173-17d56979e265",
+                "expiry": 1397229919,
+                "data": {
+                    "test": {}
+                }
+            }
+        ]```
+
+* POST    /fetchAndClearAll
+ * Request: 
+   * Example:
+     ```{
+            "registration_id": "857DE46BBBAA3BA840500986D7EE6DEF891135BC6CF643966BDFF648EC496203"
+        }```
+ * Response: Content-Type: application/json; charset=utf-8
+   * Example:
+     ```[
+            {
+                "id": "57fce493-21eb-477f-b173-17d56979e265",
+                "expiry": 1397229919,
+                "data": {
+                    "test": {}
+                }
+            }
+        ]```
+
 ## License
 
 This project is released under the Apache License v2, for more details see the 'LICENSE' file.
