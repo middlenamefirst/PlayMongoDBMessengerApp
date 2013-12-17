@@ -41,13 +41,12 @@ Request: The Content-Type and HTTP Body Data are currently ignored for this requ
 
 Response: Content-Type: application/json; charset=utf-8
 
- The response returned upon successful registration is a JSON object containing the mailbox registration ID as illustrated below.
+The response returned upon successful registration is a JSON object containing the mailbox registration ID as illustrated below.
 ```json
 {
   "registration_id": "296B345063A70AD82206B96760C41EA4322F12A5F66E911C56641D4CF5BB3A7B"
 }
 ```
-
 ### POST    /deregister
 Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
 ```json
@@ -63,7 +62,6 @@ The response returned is a Status-Code 200 (OK) if the mailbox was successfully 
   "status": "OK"
 }
 ```
-
 ### POST    /send
 Request: The request body needs to contain a JSON object with the following properties. Note that the "data" property can be any valid JSON. This is the message data that will be delivered upon retrieval.
 
@@ -82,7 +80,6 @@ The response returned contains the message ID as illustrated below.
   "message_id": "57fce493-21eb-477f-b173-17d56979e265"
 }
 ```
-
 ### POST    /fetchAll
 Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
 
@@ -105,7 +102,6 @@ The response returned contains an array of message objects as illustrated below.
   }
 ]
 ```
-
 ### POST    /fetchAndClearAll
 Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
 
@@ -128,7 +124,6 @@ The response returned contains an array of message objects as illustrated below.
   }
 ]
 ```
-
 ## License
 
 This project is released under the Apache License v2, for more details see the 'LICENSE' file.
