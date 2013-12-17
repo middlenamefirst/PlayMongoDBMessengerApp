@@ -5,8 +5,8 @@
 # Home page
 POST    /register                           controllers.Application.register
 POST    /deregister                         controllers.Application.deregister
-POST	/send								controllers.Application.send
-POST	/fetchAll							controllers.Application.fetchAll
+POST	  /send								                controllers.Application.send
+POST	  /fetchAll							              controllers.Application.fetchAll
 POST    /fetchAndClearAll                   controllers.Application.fetchAndClearAll
 
 # Map static resources from the /public folder to the /assets URL path
