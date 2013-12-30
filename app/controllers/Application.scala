@@ -1,96 +1,120 @@
 package controllers
 
-import models.Message
-import scala.collection.mutable
-import play.api._
+import models.{Mailbox, Message}
 import play.api.mvc._
 import play.api.libs.json._
-import play.api.Play.current
 import java.security.MessageDigest
 import java.math.BigInteger
 import play.api.libs.json.JsValue
+import play.api.libs.concurrent.Execution.Implicits.defaultContext
 import org.joda.time.Instant
+import reactivemongo.bson.{BSONString, BSONObjectID}
+import datastore.ReactiveMongoDatastore
+import scala.concurrent.Future
+import play.api.libs.iteratee.Iteratee
 
 object Application extends Controller {
 
-  val mailCache = new mutable.HashMap[String, mutable.SynchronizedQueue[Message]] with mutable.SynchronizedMap[String, mutable.SynchronizedQueue[Message]]
-
   def uuid = java.util.UUID.randomUUID.toString()
 
-  def toHex(bytes: Array[Byte]): String = {
+  def toHexString(bytes: Array[Byte]): String = {
     val bigInt = new BigInteger(1, bytes)
     return String.format("%0" + (bytes.length << 1) + "X", bigInt)
   }
 
-  def register = Action { request =>
+  val ErrorProperty = "error"
+  val StatusProperty = "status"
+  val ExpiryProperty = "expiry"
+  val DataProperty = "data"
+
+  private def errorMessage(str: String) = Map(ErrorProperty -> str)
+  private def statusMessage(str: String) = Map(StatusProperty -> str)
+
+  def register = Action.async { request =>
     val uuidString = uuid
 
     val md: MessageDigest = MessageDigest.getInstance("SHA-256");
 
     val idBytes = md.digest(uuidString.getBytes())
 
-    val idHexString = toHex(idBytes)
+    val idHexString = toHexString(idBytes)
 
-    mailCache.put(idHexString, new mutable.SynchronizedQueue[Message]()).fold(
-      Ok(Json.toJson(Map("registration_id" -> idHexString))))(
-        _ => InternalServerError(Json.toJson(Map("error" -> "Cache collision"))))
-  }
+    val mailbox = Mailbox(Some(BSONObjectID.generate), BSONString(idHexString))
 
-  def deregister = Action(parse.json) { request =>
-    val jsonValue = request.body
-
-    val jsResult: JsResult[String] = (jsonValue \ "registration_id").validate[String]
-
-    jsResult.fold(_ => BadRequest(Json.toJson(Map("error" -> "Missing registration_id property"))),
-      value => mailCache.remove(value).fold(
-        BadRequest(Json.toJson(Map("error" -> "Invalid registration_id property"))))(
-          queue => Ok(Json.toJson(Map("status" -> "OK")))))
-  }
-
-  private def getMailQueue(jsonValue: JsValue) = {
-    (jsonValue \ "registration_id").validate[String].fold(_ => None, mailCache.get(_))
-  }
-  
-  private def putMailQueue(jsonValue: JsValue) = {
-    (jsonValue \ "registration_id").validate[String].fold(_ => None, mailCache.put(_, new mutable.SynchronizedQueue[Message]()))
-  }
-
-  def send = Action(parse.json) { request =>
-    val jsonValue = request.body
-
-    getMailQueue(jsonValue) match {
-      case None => BadRequest(Json.toJson(Map("error" -> "Invalid or missing registration_id property")))
-      case Some(queue) => {
-        val expirySeconds: Int = (jsonValue \ "expiry").validate[Int].fold(
-          valid = (res => res),
-          invalid = (e => 0))
-
-        (jsonValue \ "data").validate[JsValue].fold(
-          valid = (res => {
-            val messageId = uuid
-            queue += Message(messageId, (Instant.now().getMillis()) / 1000 + expirySeconds, res)
-            Ok(Json.toJson(Map("message_id" -> messageId)))
-          }),
-          invalid = (e => BadRequest(Json.toJson(Map("error" -> "Invalid or missing data property")))))
+    ReactiveMongoDatastore.MailboxDAO.insert(mailbox).map(
+      lastError => {
+        if (lastError.ok) Ok(Json.toJson(Map(Mailbox.MailboxIdProperty -> mailbox.mailboxId.value)))
+        else InternalServerError(Json.toJson(errorMessage("Couldn't create mailbox.")))
       }
-    }
-
+    )
   }
 
-  def fetchAll = Action(parse.json) { request =>
+  def deregister = Action.async(parse.json) { request =>
     val jsonValue = request.body
 
-    getMailQueue(jsonValue).fold(
-      BadRequest(Json.toJson(Map("error" -> "Invalid or missing registration_id property"))))(
-        queue => Ok(queue.foldLeft(Json.arr())((jsonArray, message) => jsonArray :+ Json.toJson(message))))
+    val jsResult: JsResult[String] = (jsonValue \ Mailbox.MailboxIdProperty).validate[String]
+
+    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + Mailbox.MailboxIdProperty + " property")))),
+      mailboxId => {
+        ReactiveMongoDatastore.MailboxDAO.removeByMailboxId(BSONString(mailboxId)).map(
+          lastError => {
+            if (lastError.ok && lastError.updated > 0) Ok(Json.toJson(Map(Mailbox.MailboxIdProperty -> mailboxId)))
+            else InternalServerError(Json.toJson(errorMessage("Couldn't de-register mailbox with ID: " + mailboxId)))
+          }
+        )
+      }
+    )
   }
-  
-  def fetchAndClearAll = Action(parse.json) { request =>
+
+  def send = Action.async(parse.json) { request =>
     val jsonValue = request.body
 
-    putMailQueue(jsonValue).fold(
-      BadRequest(Json.toJson(Map("error" -> "Invalid or missing registration_id property"))))(
-        queue => Ok(queue.foldLeft(Json.arr())((jsonArray, message) => jsonArray :+ Json.toJson(message))))
+    val jsResult: JsResult[String] = (jsonValue \ Mailbox.MailboxIdProperty).validate[String]
+
+    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + Mailbox.MailboxIdProperty + " property")))),
+      mailboxId => {
+        ReactiveMongoDatastore.MailboxDAO.findByMailboxId(BSONString(mailboxId)).flatMap(
+          mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
+            mailbox => {
+              val expirySeconds: Int = (jsonValue \ ExpiryProperty).validate[Int].fold(valid = (res => res), invalid = (e => 0))
+
+              (jsonValue \ DataProperty).validate[JsValue].fold(
+                valid = (res => {
+                  val message = Message(Some(BSONObjectID.generate), mailbox.objectId.get, (Instant.now().getMillis()) / 1000 + expirySeconds, res)
+                  ReactiveMongoDatastore.MessageDAO.insert(message).map(
+                    lastError => {
+                      if (lastError.ok) Ok(Json.toJson(Map(Message.MessageIdProperty -> message.objectId.getOrElse(BSONObjectID("")).stringify)))
+                      else InternalServerError(Json.toJson(errorMessage("Couldn't insert into mailbox with ID: " + mailboxId)))
+                    }
+                  )
+                }),
+                invalid = (e => Future(BadRequest(Json.toJson(errorMessage("Invalid or missing data property")))))
+              )
+            }
+          }
+        )
+      }
+    )
+  }
+
+  def fetchAll = Action.async(parse.json) { request =>
+    val jsonValue = request.body
+
+    val jsResult: JsResult[String] = (jsonValue \ Mailbox.MailboxIdProperty).validate[String]
+
+    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + Mailbox.MailboxIdProperty + " property")))),
+      mailboxId => {
+        ReactiveMongoDatastore.MailboxDAO.findByMailboxId(BSONString(mailboxId)).flatMap(
+          mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
+            mailbox => {
+              ReactiveMongoDatastore.MessageDAO.findByMailboxObjectId(mailbox.objectId.get).enumerate().run(
+                Iteratee.fold[Message, JsArray](Json.arr()){ (jsonArray, message) => jsonArray :+ Json.toJson(message) }
+              )
+            }.map(jsonArray => Ok(jsonArray))
+          }
+        )
+      }
+    )
   }
 
 }
