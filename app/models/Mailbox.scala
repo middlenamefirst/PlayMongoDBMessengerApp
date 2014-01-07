@@ -1,15 +1,14 @@
 package models
 
+import datastore.BSONProperties._
+
 import reactivemongo.bson._
 
 object Mailbox {
-  val MailboxBSONObjectIdProperty = "_id"
-  val MailboxIdProperty = "mailbox_id"
-
   implicit object MailboxBSONDocumentReader extends BSONDocumentReader[Mailbox] {
     override def read(doc: BSONDocument): Mailbox = {
       Mailbox(
-        doc.getAs[BSONObjectID](MailboxBSONObjectIdProperty),
+        doc.getAs[BSONObjectID](BSONObjectIdProperty),
         doc.getAs[BSONString](MailboxIdProperty).get
       )
     }
@@ -18,7 +17,7 @@ object Mailbox {
   implicit object MailboxBSONDocumentWriter extends BSONDocumentWriter[Mailbox] {
     override def write(mailbox: Mailbox): BSONDocument = {
       BSONDocument(
-        MailboxBSONObjectIdProperty -> mailbox.objectId.getOrElse(BSONObjectID.generate),
+        BSONObjectIdProperty -> mailbox.objectId.getOrElse(BSONObjectID.generate),
         MailboxIdProperty -> mailbox.mailboxId
       )
     }

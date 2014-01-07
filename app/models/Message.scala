@@ -1,5 +1,7 @@
 package models
 
+import datastore.BSONProperties._
+
 import play.api.libs.json._
 
 import reactivemongo.bson._
@@ -8,12 +10,6 @@ import play.api.libs.json.JsSuccess
 import play.api.libs.json.JsNumber
 
 object Message {
-  val MessageIdProperty = "message_id"
-  val MessageBSONObjectIdProperty = "_id"
-  val MailboxBSONObjectIdProperty = "mailbox_object_id"
-  val ExpiryProperty = "expiry"
-  val DataProperty = "data"
-
   implicit object MessageJSONFormat extends Format[Message] {
     override def reads(json: JsValue): JsResult[Message] = JsSuccess(
       Message(
@@ -33,7 +29,7 @@ object Message {
   implicit object MessageBSONDocumentReader extends BSONDocumentReader[Message] {
     override def read(doc: BSONDocument): Message = {
       Message(
-        doc.getAs[BSONObjectID](MessageBSONObjectIdProperty),
+        doc.getAs[BSONObjectID](BSONObjectIdProperty),
         doc.getAs[BSONObjectID](MailboxBSONObjectIdProperty).get,
         doc.getAs[BSONLong](ExpiryProperty).get.value,
         Json.parse(doc.getAs[BSONString](DataProperty).get.value)
@@ -44,7 +40,7 @@ object Message {
   implicit object MessageBSONDocumentWriter extends BSONDocumentWriter[Message] {
     override def write(message: Message): BSONDocument = {
       BSONDocument(
-        MessageBSONObjectIdProperty -> message.objectId.getOrElse(BSONObjectID.generate),
+        BSONObjectIdProperty -> message.objectId.getOrElse(BSONObjectID.generate),
         MailboxBSONObjectIdProperty -> message.mailboxObjectId,
         ExpiryProperty -> message.expiry,
         DataProperty -> Json.stringify(message.data)
