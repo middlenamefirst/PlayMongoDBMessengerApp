@@ -17,6 +17,8 @@ import org.joda.time.Instant
 import reactivemongo.bson.{BSONObjectID, BSONString}
 
 import scala.concurrent.Future
+import scala.collection.immutable.Queue
+import reactivemongo.core.commands.LastError
 
 object Application extends Controller {
 
@@ -59,7 +61,8 @@ object Application extends Controller {
 
     val jsResult: JsResult[String] = (jsonValue \ MailboxIdProperty).validate[String]
 
-    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
+    jsResult.fold(
+      _ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
       mailboxId => {
         ReactiveMongoDatastore.MailboxDAO.removeByMailboxId(BSONString(mailboxId)).map(
           lastError => {
@@ -76,7 +79,8 @@ object Application extends Controller {
 
     val jsResult: JsResult[String] = (jsonValue \ MailboxIdProperty).validate[String]
 
-    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
+    jsResult.fold(
+      _ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
       mailboxId => {
         ReactiveMongoDatastore.MailboxDAO.findByMailboxId(BSONString(mailboxId)).flatMap(
           mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
@@ -107,7 +111,8 @@ object Application extends Controller {
 
     val jsResult: JsResult[String] = (jsonValue \ MailboxIdProperty).validate[String]
 
-    jsResult.fold(_ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
+    jsResult.fold(
+      _ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
       mailboxId => {
         ReactiveMongoDatastore.MailboxDAO.findByMailboxId(BSONString(mailboxId)).flatMap(
           mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
@@ -116,6 +121,40 @@ object Application extends Controller {
                 Iteratee.fold[Message, JsArray](Json.arr()){ (jsonArray, message) => jsonArray :+ Json.toJson(message) }
               )
             }.map(jsonArray => Ok(jsonArray))
+          }
+        )
+      }
+    )
+  }
+
+  def fetchAndClearAll = Action.async(parse.json) { request =>
+    val jsonValue = request.body
+
+    val jsResult: JsResult[String] = (jsonValue \ MailboxIdProperty).validate[String]
+
+    jsResult.fold(
+      _ => Future(BadRequest(Json.toJson(errorMessage("Missing " + MailboxIdProperty + " property")))),
+      mailboxId => {
+        ReactiveMongoDatastore.MailboxDAO.findByMailboxId(BSONString(mailboxId)).flatMap(
+          mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
+            mailbox => {
+              ReactiveMongoDatastore.MessageDAO.findByMailboxObjectId(mailbox.objectId.get).enumerate().run(
+                Iteratee.fold[Message, Queue[Message]](Queue()){ (q1, message) => q1 :+ message }
+              )
+            }.flatMap(
+              q2 => {
+                val futureSeq = Future.sequence(
+                  q2.foldLeft(Queue[Future[LastError]]()) {
+                    (q3, message) => q3 :+ ReactiveMongoDatastore.MessageDAO.removeByObjectId(message.objectId.get)
+                  }
+                )
+                futureSeq.map(q4 =>
+                  Ok(
+                    q2.foldLeft(Json.arr()){ (jsonArray, message) => jsonArray :+ Json.toJson(message) }
+                  )
+                )
+              }
+            )
           }
         )
       }
