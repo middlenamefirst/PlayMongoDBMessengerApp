@@ -10,6 +10,7 @@ import reactivemongo.api._
 import reactivemongo.api.collections.default.BSONCollection
 import reactivemongo.bson.{BSONString, BSONObjectID, BSONDocument}
 import reactivemongo.core.commands.LastError
+import play.api.Logger
 
 object BSONProperties {
   val BSONObjectIdProperty = "_id"
@@ -49,5 +50,8 @@ object ReactiveMongoDatastore {
     def insert(message: Message): Future[LastError] = c.insert(message)
 
     def removeByObjectId(id: BSONObjectID): Future[LastError] = c.remove(BSONDocument(BSONObjectIdProperty -> id))
+
+    def removeMessages(seq: Seq[Message]): Future[LastError] =
+      c.remove(BSONDocument(BSONObjectIdProperty -> BSONDocument("$in" -> seq.map(message => message.objectId.get))))
   }
 }

@@ -139,21 +139,14 @@ object Application extends Controller {
           mailboxOption => mailboxOption.fold(Future(BadRequest(Json.toJson(errorMessage("Non-existent mailbox with ID: " + mailboxId))))){
             mailbox => {
               ReactiveMongoDatastore.MessageDAO.findByMailboxObjectId(mailbox.objectId.get).enumerate().run(
-                Iteratee.fold[Message, Queue[Message]](Queue()){ (q1, message) => q1 :+ message }
+                Iteratee.fold[Message, Queue[Message]](Queue()){ (q, message) => q :+ message }
               )
             }.flatMap(
-              q2 => {
-                val futureSeq = Future.sequence(
-                  q2.foldLeft(Queue[Future[LastError]]()) {
-                    (q3, message) => q3 :+ ReactiveMongoDatastore.MessageDAO.removeByObjectId(message.objectId.get)
-                  }
+              q => ReactiveMongoDatastore.MessageDAO.removeMessages(q).map(_ =>
+                Ok(
+                  q.foldLeft(Json.arr()){ (jsonArray, message) => jsonArray :+ Json.toJson(message) }
                 )
-                futureSeq.map(q4 =>
-                  Ok(
-                    q2.foldLeft(Json.arr()){ (jsonArray, message) => jsonArray :+ Json.toJson(message) }
-                  )
-                )
-              }
+              )
             )
           }
         )
