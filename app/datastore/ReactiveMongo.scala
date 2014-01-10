@@ -10,7 +10,6 @@ import reactivemongo.api._
 import reactivemongo.api.collections.default.BSONCollection
 import reactivemongo.bson.{BSONString, BSONObjectID, BSONDocument}
 import reactivemongo.core.commands.LastError
-import play.api.Logger
 
 object BSONProperties {
   val BSONObjectIdProperty = "_id"
