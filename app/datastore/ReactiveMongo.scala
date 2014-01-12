@@ -13,11 +13,11 @@ import reactivemongo.core.commands.LastError
 
 object BSONProperties {
   val BSONObjectIdProperty = "_id"
-  val MessageIdProperty = "message_id"
-  val MailboxBSONObjectIdProperty = "mailbox_object_id"
+  val MessageIdProperty = "messageId"
+  val MailboxBSONObjectIdProperty = "mailboxObjectId"
   val ExpiryProperty = "expiry"
   val DataProperty = "data"
-  val MailboxIdProperty = "mailbox_id"
+  val MailboxIdProperty = "mailboxId"
 }
 
 object ReactiveMongoDatastore {

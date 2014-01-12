@@ -1,7 +1,9 @@
-PlayMessengerApp
-================
+messenger
+=========
 
-This is small HTTP based messaging server application based on the [Play Framework](http://www.playframework.com/) and [MongoDB](http://www.mongodb.org/). Via HTTP POST methods one can:
+This is HTTP based messaging server application based on the [Play Framework](http://www.playframework.com/) and [MongoDB](http://www.mongodb.org/).
+
+Via HTTP methods and WebSockets one can:
 
 1. Register for a mailbox
 2. Deregister a mailbox
@@ -53,98 +55,10 @@ The database.name configuration property controls the name of the database (that
 
 ## Using The Server
 
-Interacting with the server is done via HTTP POST requests and the [JSON](http://en.wikipedia.org/wiki/JSON) data format. The following routes and data formats are supported:
+Interacting with the server is done via HTTP and the [JSON](http://en.wikipedia.org/wiki/JSON) data format.
 
-### POST    /register
-Request: The Content-Type and HTTP Body Data are currently ignored for this request.
+See the [Postman](http://www.getpostman.com/) JSON file under [docs](docs/Messenger.json.postman_collection) for the supported routes and formats.
 
-Response: Content-Type: application/json; charset=utf-8
-
-The response returned upon successful registration is a JSON object containing the mailbox registration ID as illustrated below.
-```json
-{
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361"
-}
-```
-### POST    /deregister
-Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
-```json
-{
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361"
-}
-```
-Response: Content-Type: application/json; charset=utf-8
-
-The response returned is a Status-Code 200 (OK) if the mailbox was successfully deregistered with the mailbox ID as JSON.
-```json
-{
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361"
-}
-```
-### POST    /send
-Request: The request body needs to contain a JSON object with the following properties. Note that the "data" property can be any valid JSON. This is the message data that will be delivered upon retrieval.
-
-```json
-{ 
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361",
-  "expiry": 10000000,
-  "data": {"test": {}}
-}
-```
-Response: Content-Type: application/json; charset=utf-8
-
-The response returned contains the message ID as illustrated below.
-```json
-{
-    "message_id": "52c1e0bc630000820029a3d5"
-}
-```
-### POST    /fetchAll
-Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
-
-```json
-{
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361"
-}
-```
-Response: Content-Type: application/json; charset=utf-8
-
-The response returned contains an array of message objects as illustrated below.
-```json
-[
-  {
-    "message_id": "52c1e0bc630000820029a3d5",
-    "mailbox_object_id": "52c1e09b630000800029a3d4",
-    "expiry": 1398437692,
-    "data": {
-      "test": {}
-    }
-  }
-]
-```
-### POST    /fetchAndClearAll
-Request: The request body needs to contain JSON object with the mailbox registration ID as illustrated below.
-
-```json
-{
-  "mailbox_id": "033BB24B2B9A6C1DE7F997E7DF0D9EE78B455DE0710B77291D5E69AF7A35F361"
-}
-```
-Response: Content-Type: application/json; charset=utf-8
-
-The response returned contains an array of message objects as illustrated below.
-```json
-[
-  {
-    "message_id": "52c1e0bc630000820029a3d5",
-    "mailbox_object_id": "52c1e09b630000800029a3d4",
-    "expiry": 1398437692,
-    "data": {
-      "test": {}
-    }
-  }
-]
-```
 ## License
 
 This project is released under the Apache License v2, for more details see the 'LICENSE' file.
